@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Lunacy</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+
+<nav id="sidebar">
+  <h1>Lunacy</h1>
+
+  <div class="nav-section">
+    <div class="nav-label">Shelves</div>
+    <a class="nav-item" data-route="shelf:" href="#/shelf/">All books</a>
+    <a class="nav-item" data-route="shelf:Reading" href="#/shelf/Reading">Reading</a>
+    <a class="nav-item" data-route="shelf:Read" href="#/shelf/Read">Read</a>
+    <a class="nav-item" data-route="shelf:To Read" href="#/shelf/To Read">To Read</a>
+  </div>
+
+  <div class="nav-section">
+    <div class="nav-label">Browse</div>
+    <a class="nav-item" data-route="authors" href="#/authors">Authors</a>
+    <a class="nav-item" data-route="series" href="#/series">Series</a>
+  </div>
+
+  <div class="nav-stats" id="stats-display"></div>
+</nav>
+
+<div id="main">
+  <div id="toolbar">
+    <span id="page-title"></span>
+    <input id="search" type="search" placeholder="Search…" autocomplete="off">
+    <select id="sort-select">
+      <option value="recent">Recently read</option>
+      <option value="title">Title</option>
+      <option value="author">Author</option>
+      <option value="progress">Progress</option>
+    </select>
+    <button id="sort-dir" title="Toggle sort direction">↓</button>
+  </div>
+
+  <div id="content">
+    <div id="grid-wrap">
+      <div id="grid"></div>
+      <div id="loading" style="display:none">Loading…</div>
+      <div id="empty"  style="display:none">Nothing here yet.</div>
+      <div id="sentinel"></div>
+    </div>
+
+    <!-- Detail panel -->
+    <div id="detail">
+      <div id="detail-resize"></div>
+      <button id="detail-close" aria-label="Close">×</button>
+      <div id="detail-cover"></div>
+      <div id="detail-body">
+        <div id="detail-title"></div>
+        <div id="detail-author"></div>
+        <div id="detail-series"></div>
+        <div id="detail-meta"></div>
+        <div id="detail-progress"></div>
+        <div id="detail-annotations"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="/app.js"></script>
+</body>
+</html>

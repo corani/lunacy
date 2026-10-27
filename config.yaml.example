@@ -1,0 +1,9 @@
+server:
+  addr: ":8080"
+  username: "moon"
+  password: "secret"
+
+data_dir: "./data"
+
+backup:
+  max_count: 10
