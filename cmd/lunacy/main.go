@@ -16,6 +16,8 @@ import (
 	"github.com/corani/lunacy/static"
 )
 
+var version = "dev"
+
 func main() {
 	cfgPath := flag.String("config", "", "path to config.yaml (default: search standard locations)")
 	flag.Parse()
@@ -26,6 +28,7 @@ func main() {
 	}
 
 	log := logger.New("lunacy")
+	log.Info("starting", "version", version, "addr", cfg.Server.Addr, "data_dir", cfg.DataDir, "auth", cfg.Server.Username != "")
 
 	// Ensure data directories exist.
 	davRoot := filepath.Join(cfg.DataDir, "webdav")
@@ -71,7 +74,6 @@ func main() {
 	mux.Handle("/dav/", davFinal)
 	mux.Handle("/", apiHandler.App())
 
-	log.Info("listening", "addr", cfg.Server.Addr)
 	if err := http.ListenAndServe(cfg.Server.Addr, webdav.LoggingMiddleware(logger.New("http"), mux)); err != nil {
 		log.Error("listen", "err", err)
 		os.Exit(1)
