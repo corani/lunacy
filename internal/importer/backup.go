@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"html"
 	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -17,15 +18,15 @@ import (
 
 // BackupImporter handles .mrpro file processing.
 type BackupImporter struct {
-	st        *store.Store
-	backupDir string
-	maxCount  int
-	log       *logger.Logger
+	st       *store.Store
+	davRoot  string
+	maxCount int
+	log      *logger.Logger
 }
 
 // NewBackupImporter creates a BackupImporter.
-func NewBackupImporter(st *store.Store, backupDir string, maxCount int, log *logger.Logger) *BackupImporter {
-	return &BackupImporter{st: st, backupDir: backupDir, maxCount: maxCount, log: log}
+func NewBackupImporter(st *store.Store, davRoot string, maxCount int, log *logger.Logger) *BackupImporter {
+	return &BackupImporter{st: st, davRoot: davRoot, maxCount: maxCount, log: log}
 }
 
 // Import processes a .mrpro file at path.
@@ -159,7 +160,7 @@ func (b *BackupImporter) Import(path string) error {
 		}
 	}
 
-	// Enforce max backup count.
+	// Enforce max backup count across all .mrpro files under davRoot.
 	if err := b.enforceMaxCount(); err != nil {
 		return fmt.Errorf("backup import: enforce max count: %w", err)
 	}
@@ -230,15 +231,11 @@ func (b *BackupImporter) importPositions(data []byte) error {
 	return nil
 }
 
-// enforceMaxCount deletes the oldest .mrpro files when the count exceeds maxCount.
+// enforceMaxCount deletes the oldest .mrpro files when the total count exceeds maxCount.
+// It walks the entire davRoot so backups in any subdirectory are counted.
 func (b *BackupImporter) enforceMaxCount() error {
 	if b.maxCount <= 0 {
 		return nil
-	}
-
-	entries, err := os.ReadDir(b.backupDir)
-	if err != nil {
-		return err
 	}
 
 	type fileInfo struct {
@@ -246,18 +243,22 @@ func (b *BackupImporter) enforceMaxCount() error {
 		modTime int64
 	}
 	var files []fileInfo
-	for _, e := range entries {
-		if !strings.HasSuffix(e.Name(), ".mrpro") {
-			continue
+	err := filepath.WalkDir(b.davRoot, func(path string, d fs.DirEntry, err error) error {
+		if err != nil || d.IsDir() {
+			return err
 		}
-		info, err := e.Info()
+		if !strings.HasSuffix(strings.ToLower(d.Name()), ".mrpro") {
+			return nil
+		}
+		info, err := d.Info()
 		if err != nil {
-			continue
+			return nil
 		}
-		files = append(files, fileInfo{
-			path:    filepath.Join(b.backupDir, e.Name()),
-			modTime: info.ModTime().UnixMilli(),
-		})
+		files = append(files, fileInfo{path: path, modTime: info.ModTime().UnixMilli()})
+		return nil
+	})
+	if err != nil {
+		return err
 	}
 
 	// Sort oldest first.

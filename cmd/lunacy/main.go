@@ -53,8 +53,7 @@ func main() {
 	defer st.Close() //nolint:errcheck
 
 	// Build importers.
-	backupDir := filepath.Join(davRoot, "Backup")
-	bi := importer.NewBackupImporter(st, backupDir, cfg.Backup.MaxCount, logger.New("backup"))
+	bi := importer.NewBackupImporter(st, davRoot, cfg.Backup.MaxCount, logger.New("backup"))
 
 	// Build WebDAV handler.
 	davHandler := webdav.New(davRoot, st, bi, logger.New("webdav"))
