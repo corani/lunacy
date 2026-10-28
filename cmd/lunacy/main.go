@@ -55,14 +55,20 @@ func main() {
 
 	// Build WebDAV handler.
 	davHandler := webdav.New(davRoot, st, bi, logger.New("webdav"))
-	authDav := webdav.BasicAuth(cfg.Server.Username, cfg.Server.Password, davHandler)
+
+	// Wrap with BasicAuth only when credentials are configured.
+	// Leave username empty to disable auth (e.g. when running behind Traefik).
+	var davFinal http.Handler = davHandler
+	if cfg.Server.Username != "" {
+		davFinal = webdav.BasicAuth(cfg.Server.Username, cfg.Server.Password, davHandler)
+	}
 
 	// Build API/UI handler.
 	apiHandler := api.New(st, coverDir, static.FS, logger.New("api"))
 
 	// Route: /dav/* → WebDAV, everything else → API/UI.
 	mux := http.NewServeMux()
-	mux.Handle("/dav/", authDav)
+	mux.Handle("/dav/", davFinal)
 	mux.Handle("/", apiHandler.App())
 
 	log.Info("listening", "addr", cfg.Server.Addr)
