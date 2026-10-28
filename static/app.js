@@ -376,6 +376,13 @@ async function loadStats() {
   } catch {}
 }
 
+async function loadVersion() {
+  try {
+    const v = await api('/api/version');
+    $('version-display').textContent = v.version;
+  } catch {}
+}
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function esc(s) {
   return String(s)
@@ -484,6 +491,7 @@ window.addEventListener('hashchange', () => {
 
 // ── Boot ──────────────────────────────────────────────────────────────────────
 loadStats();
+loadVersion();
 const initRoute = parseHash(window.location.hash);
 navigate(initRoute.type === 'book-detail'
   ? { type: 'shelf', param: '' }  // go to grid first, then open detail

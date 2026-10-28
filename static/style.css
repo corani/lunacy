@@ -48,9 +48,10 @@ body {
   font-size: 18px;
   font-weight: 700;
   color: var(--accent);
-  padding: 0 16px 20px;
+  padding: 0 16px 2px;
   letter-spacing: 0.04em;
 }
+#version-display { font-size: 11px; color: var(--text-muted); padding: 0 16px 20px; margin-top: -14px; opacity: 0.6; }
 .nav-section { margin-bottom: 8px; }
 .nav-label {
   font-size: 10px;

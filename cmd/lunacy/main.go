@@ -67,7 +67,7 @@ func main() {
 	}
 
 	// Build API/UI handler.
-	apiHandler := api.New(st, coverDir, static.FS, logger.New("api"))
+	apiHandler := api.New(st, coverDir, static.FS, logger.New("api"), version)
 
 	// Route: /dav/* → WebDAV, everything else → API/UI.
 	mux := http.NewServeMux()
