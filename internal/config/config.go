@@ -27,9 +27,7 @@ type BackupConfig struct {
 func defaults() Config {
 	return Config{
 		Server: ServerConfig{
-			Addr:     ":8080",
-			Username: "moon",
-			Password: "secret",
+			Addr: ":8080",
 		},
 		DataDir: "$HOME/.local/share/lunacy",
 		Backup: BackupConfig{
