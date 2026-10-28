@@ -83,11 +83,11 @@ func generate(key string) string {
 }
 
 func splitKey(key string) (title, author string) {
-	if i := strings.Index(key, "\n"); i >= 0 {
-		return strings.TrimSpace(key[:i]), strings.TrimSpace(key[i+1:])
+	if before, after, ok := strings.Cut(key, "\n"); ok {
+		return strings.TrimSpace(before), strings.TrimSpace(after)
 	}
-	if i := strings.Index(key, " - "); i >= 0 {
-		return strings.TrimSpace(key[:i]), strings.TrimSpace(key[i+3:])
+	if before, after, ok := strings.Cut(key, " - "); ok {
+		return strings.TrimSpace(before), strings.TrimSpace(after)
 	}
 	return key, ""
 }

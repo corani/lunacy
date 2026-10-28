@@ -25,20 +25,20 @@ import (
 
 // Annotation holds a parsed annotation from a .an file.
 type Annotation struct {
-	ID           int
-	Chapter      int    // v1 only
-	SplitIndex   int    // v1 only
-	CharOffset   int    // v1 only
-	Page         int    // v2 (PDF) only
-	Length       int
-	Color        int64
-	CreatedAt    int64  // Unix ms
-	Type         int    // 1=highlight, 0=bookmark
-	Underline    int
+	ID            int
+	Chapter       int // v1 only
+	SplitIndex    int // v1 only
+	CharOffset    int // v1 only
+	Page          int // v2 (PDF) only
+	Length        int
+	Color         int64
+	CreatedAt     int64 // Unix ms
+	Type          int   // 1=highlight, 0=bookmark
+	Underline     int
 	Strikethrough int
-	Note         string
-	Text         string
-	ChapterLabel string // v2 only: chapter heading at this position
+	Note          string
+	Text          string
+	ChapterLabel  string // v2 only: chapter heading at this position
 }
 
 // ParseAN parses the decompressed content of a .an file.
@@ -118,7 +118,7 @@ func parseANv1Record(lines []string) (Annotation, bool) {
 	}
 
 	ann := Annotation{
-		ID:         parseInt(lines[0]),
+		ID: parseInt(lines[0]),
 		// lines[1] = bookTitle, lines[2] = filePath, lines[3] = lowerFilePath
 		Chapter:    parseInt(lines[4]),
 		SplitIndex: parseInt(lines[5]),

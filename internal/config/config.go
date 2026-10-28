@@ -9,9 +9,9 @@ import (
 )
 
 type Config struct {
-	Server  ServerConfig  `yaml:"server"`
-	DataDir string        `yaml:"data_dir"`
-	Backup  BackupConfig  `yaml:"backup"`
+	Server  ServerConfig `yaml:"server"`
+	DataDir string       `yaml:"data_dir"`
+	Backup  BackupConfig `yaml:"backup"`
 }
 
 type ServerConfig struct {

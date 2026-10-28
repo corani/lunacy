@@ -22,9 +22,9 @@ type Book struct {
 	ReadState   int     `json:"read_state"` // 0=unread, 1=reading, 3=finished
 
 	// Joined fields (populated by list queries)
-	Pct          float64 `json:"pct"`
-	LastRead     int64   `json:"last_read"`
-	AnnotCount   int     `json:"annot_count"`
+	Pct        float64 `json:"pct"`
+	LastRead   int64   `json:"last_read"`
+	AnnotCount int     `json:"annot_count"`
 }
 
 // Position is a book's current reading position.
@@ -175,7 +175,6 @@ func (s *Store) FindFilenameByBasename(basename string) (string, error) {
 	return filename, nil
 }
 
-
 func (s *Store) UpsertReadingDay(filename string, day int, readTimeMs, wordsRead int64, pct float64) error {
 	_, err := s.db.Exec(`
 		INSERT INTO reading_days (filename, day, read_time_s, words_read, pct)
@@ -254,8 +253,7 @@ func (s *Store) ListBooks(shelf, author, series, search, sort, dir string, limit
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
-
+	defer rows.Close() //nolint:errcheck
 	var books []Book
 	for rows.Next() {
 		var b Book
@@ -304,8 +302,7 @@ func (s *Store) GetAnnotations(filename string) ([]Annotation, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
-
+	defer rows.Close() //nolint:errcheck
 	var anns []Annotation
 	for rows.Next() {
 		var a Annotation
@@ -327,8 +324,7 @@ func (s *Store) GetReadingDays(filename string) ([]ReadingDay, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
-
+	defer rows.Close() //nolint:errcheck
 	var days []ReadingDay
 	for rows.Next() {
 		var d ReadingDay
@@ -365,8 +361,7 @@ func (s *Store) ListAuthors() ([]AuthorSummary, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
-
+	defer rows.Close() //nolint:errcheck
 	var out []AuthorSummary
 	for rows.Next() {
 		var a AuthorSummary
@@ -386,8 +381,7 @@ func (s *Store) ListSeries() ([]SeriesSummary, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
-
+	defer rows.Close() //nolint:errcheck
 	var out []SeriesSummary
 	for rows.Next() {
 		var ss SeriesSummary
@@ -430,7 +424,7 @@ func buildBookFilter(shelf, author, series, search string) (string, []any) {
 		args = append(args, series)
 	}
 	if search != "" {
-		for _, word := range strings.Fields(search) {
+		for word := range strings.FieldsSeq(search) {
 			w := "%" + word + "%"
 			clauses = append(clauses, "(b.title LIKE ? OR b.author LIKE ? OR b.series LIKE ?)")
 			args = append(args, w, w, w)
@@ -448,4 +442,3 @@ func boolToInt(b bool) int {
 	}
 	return 0
 }
-

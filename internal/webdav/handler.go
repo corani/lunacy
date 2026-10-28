@@ -156,7 +156,7 @@ func decompressZlib(data []byte) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("zlib: %w", err)
 	}
-	defer r.Close()
+	defer r.Close() //nolint:errcheck
 	out, err := io.ReadAll(r)
 	if err != nil {
 		return "", fmt.Errorf("zlib read: %w", err)

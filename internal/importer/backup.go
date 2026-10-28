@@ -49,7 +49,7 @@ func (b *BackupImporter) Import(path string) error {
 	if err != nil {
 		return fmt.Errorf("backup import: open mrbooks: %w", err)
 	}
-	defer mrdb.Close()
+	defer mrdb.Close() //nolint:errcheck
 
 	books, err := mrdb.Books()
 	if err != nil {
@@ -285,13 +285,13 @@ func (b *BackupImporter) CopyToDir(src, destDir string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	defer in.Close()
+	defer in.Close()  //nolint:errcheck
 
 	out, err := os.Create(dst)
 	if err != nil {
 		return "", err
 	}
-	defer out.Close()
+	defer out.Close() //nolint:errcheck
 
 	if _, err := io.Copy(out, in); err != nil {
 		return "", err
@@ -316,6 +316,7 @@ func SplitAuthors(raw string) []string {
 	}
 	return out
 }
+
 // Format examples: "<Series Name>\n#3.0#\n" or just "Fiction\n".
 var categoryRe = regexp.MustCompile(`<([^>]+)>\s*\n#([\d.]+)#`)
 
@@ -330,8 +331,8 @@ func parseCategory(cat string) (series string, index float64) {
 
 // cleanField strips trailing edit-history markers (separated by #@#).
 func cleanField(s string) string {
-	if idx := strings.Index(s, "#@#"); idx >= 0 {
-		return strings.TrimSpace(s[:idx])
+	if before, _, ok := strings.Cut(s, "#@#"); ok {
+		return strings.TrimSpace(before)
 	}
 	return strings.TrimSpace(s)
 }

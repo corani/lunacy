@@ -54,7 +54,7 @@ func (h *Handler) serveStatic(fs embed.FS) {
 				return
 			}
 			w.Header().Set("Content-Type", mime)
-			w.Write(data)
+			w.Write(data) //nolint:errcheck
 		})
 	}
 	serve("/style.css", "text/css; charset=utf-8", "style.css")
@@ -161,15 +161,15 @@ func (h *Handler) serveSVGCover(w http.ResponseWriter, key string) {
 	w.Header().Set("Content-Type", "image/svg+xml")
 	path, err := cover.Generate(h.coverDir, key)
 	if err != nil {
-		fmt.Fprint(w, cover.SVG(key))
+		fmt.Fprint(w, cover.SVG(key)) //nolint:errcheck
 		return
 	}
 	data, err := os.ReadFile(path)
 	if err != nil {
-		fmt.Fprint(w, cover.SVG(key))
+		fmt.Fprint(w, cover.SVG(key)) //nolint:errcheck
 		return
 	}
-	w.Write(data)
+	w.Write(data) //nolint:errcheck
 }
 
 func (h *Handler) writeJSON(w http.ResponseWriter, v any) {
@@ -178,7 +178,6 @@ func (h *Handler) writeJSON(w http.ResponseWriter, v any) {
 		h.log.Error("json encode", "err", err)
 	}
 }
-
 func (h *Handler) jsonError(w http.ResponseWriter, r *http.Request, code int, err error) {
 	h.log.Error("api", "method", r.Method, "path", r.URL.Path, "status", code, "err", err)
 	http.Error(w, err.Error(), code)
