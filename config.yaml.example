@@ -1,5 +1,6 @@
 server:
   addr: ":8080"
+  # Leave username empty to disable BasicAuth (e.g. when running behind Traefik).
   username: "moon"
   password: "secret"
 
