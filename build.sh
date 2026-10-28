@@ -3,7 +3,12 @@
 prog=$(realpath "$0") || exit 1
 root=$(dirname "$prog")
 rc=0
-version=${VERSION:-dev}
+if [ -z "${VERSION:-}" ]; then
+  latest=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+  version="${latest:+${latest}-}dev"
+else
+  version=$VERSION
+fi
 
 function log_info { echo "[INFO] $*"; }
 function log_error { echo "[ERRO] $*" >&2; }

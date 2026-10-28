@@ -20,11 +20,12 @@ type Handler struct {
 	st       *store.Store
 	coverDir string
 	log      *logger.Logger
+	version  string
 }
 
 // New creates and wires all API routes onto a ServeMux.
-func New(st *store.Store, coverDir string, fs embed.FS, log *logger.Logger) *Handler {
-	h := &Handler{mux: http.NewServeMux(), st: st, coverDir: coverDir, log: log}
+func New(st *store.Store, coverDir string, fs embed.FS, log *logger.Logger, version string) *Handler {
+	h := &Handler{mux: http.NewServeMux(), st: st, coverDir: coverDir, log: log, version: version}
 	h.routes()
 	h.serveStatic(fs)
 	return h
@@ -34,6 +35,7 @@ func New(st *store.Store, coverDir string, fs embed.FS, log *logger.Logger) *Han
 func (h *Handler) App() http.Handler { return h.mux }
 
 func (h *Handler) routes() {
+	h.mux.HandleFunc("GET /api/version", h.getVersion)
 	h.mux.HandleFunc("GET /api/stats", h.getStats)
 	h.mux.HandleFunc("GET /api/books", h.listBooks)
 	h.mux.HandleFunc("GET /api/book", h.getBook)
@@ -60,6 +62,10 @@ func (h *Handler) serveStatic(fs embed.FS) {
 	serve("/style.css", "text/css; charset=utf-8", "style.css")
 	serve("/app.js", "application/javascript; charset=utf-8", "app.js")
 	serve("/", "text/html; charset=utf-8", "index.html")
+}
+
+func (h *Handler) getVersion(w http.ResponseWriter, r *http.Request) {
+	h.writeJSON(w, map[string]string{"version": h.version})
 }
 
 func (h *Handler) getStats(w http.ResponseWriter, r *http.Request) {
