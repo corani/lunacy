@@ -49,7 +49,7 @@ func OpenBackup(data []byte) (*Backup, error) {
 		return nil, fmt.Errorf("mrpro: open _names.list: %w", err)
 	}
 	nameBytes, err := io.ReadAll(rc)
-	rc.Close()
+	rc.Close() //nolint:errcheck
 	if err != nil {
 		return nil, fmt.Errorf("mrpro: read _names.list: %w", err)
 	}
@@ -80,7 +80,7 @@ func (b *Backup) Extract(suffix string) ([]byte, error) {
 				return nil, fmt.Errorf("mrpro: open %s: %w", path, err)
 			}
 			data, err := io.ReadAll(rc)
-			rc.Close()
+			rc.Close() //nolint:errcheck
 			if err != nil {
 				return nil, fmt.Errorf("mrpro: read %s: %w", path, err)
 			}

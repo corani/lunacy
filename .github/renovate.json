@@ -1,0 +1,55 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:recommended"],
+  "postUpdateOptions": ["gomodTidy"],
+  "packageRules": [
+    {
+      "matchUpdateTypes": ["patch", "digest"],
+      "labels": ["renovate", "patch-update"],
+      "automerge": true
+    },
+    {
+      "matchUpdateTypes": ["minor"],
+      "labels": ["renovate", "minor-update"],
+      "automerge": true
+    },
+    {
+      "matchUpdateTypes": ["major"],
+      "labels": ["renovate", "major-update"],
+      "dependencyDashboardApproval": true
+    },
+    {
+      "matchManagers": ["gomod"],
+      "matchDepNames": ["go"],
+      "matchDepTypes": ["golang"],
+      "rangeStrategy": "bump"
+    },
+    {
+      "matchManagers": ["gomod", "custom.regex"],
+      "matchPackageNames": ["go"],
+      "groupName": "Go version"
+    },
+    {
+      "matchManagers": ["dockerfile"],
+      "matchPackageNames": ["golang"],
+      "enabled": false
+    }
+  ],
+  "dependencyDashboardLabels": ["renovate"],
+  "prConcurrentLimit": 4,
+  "automergeType": "pr",
+  "platformAutomerge": true,
+  "commitMessagePrefix": "chore(deps):",
+  "enabledManagers": ["gomod", "dockerfile", "github-actions", "custom.regex"],
+  "customManagers": [
+    {
+      "customType": "regex",
+      "managerFilePatterns": ["/^Dockerfile$/"],
+      "matchStrings": [
+        "(?:^|\\r?\\n)ARG GO_VERSION=(?<currentValue>\\d+\\.\\d+\\.\\d+)(?:\\r?\\n|$)"
+      ],
+      "depNameTemplate": "go",
+      "datasourceTemplate": "golang-version"
+    }
+  ]
+}

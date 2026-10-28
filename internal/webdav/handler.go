@@ -141,14 +141,9 @@ func BasicAuth(username, password string, next http.Handler) http.Handler {
 	})
 }
 
-// MkdirAll ensures the WebDAV directory structure exists on disk.
+// MkdirAll ensures the WebDAV root directory exists on disk.
 func MkdirAll(davRoot string) error {
-	for _, sub := range []string{"Cache", "Backup"} {
-		if err := os.MkdirAll(filepath.Join(davRoot, sub), 0o755); err != nil {
-			return err
-		}
-	}
-	return nil
+	return os.MkdirAll(davRoot, 0o755)
 }
 
 func decompressZlib(data []byte) (string, error) {
@@ -156,7 +151,7 @@ func decompressZlib(data []byte) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("zlib: %w", err)
 	}
-	defer r.Close()
+	defer r.Close() //nolint:errcheck
 	out, err := io.ReadAll(r)
 	if err != nil {
 		return "", fmt.Errorf("zlib read: %w", err)

@@ -80,7 +80,7 @@ func parseEPUBPosition(s string) (Position, error) {
 
 	colonParts := strings.SplitN(hashParts[1], ":", 2)
 	if len(colonParts) != 2 {
-		return p, fmt.Errorf("invalid epub position %q: missing :", s)
+		return p, fmt.Errorf("invalid epub position %q: missing colon separator", s)
 	}
 	charOffset, err := strconv.Atoi(colonParts[0])
 	if err != nil {
@@ -109,11 +109,11 @@ func parsePDFPosition(s string) (Position, error) {
 	// Some PDF positions have extra fields we don't need; take first two colon parts.
 	colonParts := strings.SplitN(s, ":", 2)
 	if len(colonParts) != 2 {
-		return p, fmt.Errorf("invalid pdf position %q: missing :", s)
+		return p, fmt.Errorf("invalid pdf position %q: missing colon separator", s)
 	}
 
 	// Page may be a float in some edge cases; take integer part.
-	pageStr := strings.SplitN(colonParts[0], ".", 2)[0]
+	pageStr, _, _ := strings.Cut(colonParts[0], ".")
 	page, err := strconv.Atoi(pageStr)
 	if err != nil {
 		return p, fmt.Errorf("invalid page in %q: %w", s, err)

@@ -1,0 +1,15 @@
+services:
+  lunacy:
+    build:
+      context: .
+      args:
+        UID: "${LUNACY_UID:-1000}"
+        GID: "${LUNACY_GID:-1000}"
+    ports:
+      - "127.0.0.1:8080:8080"
+    volumes:
+      - lunacy-data:/data
+    restart: unless-stopped
+
+volumes:
+  lunacy-data:

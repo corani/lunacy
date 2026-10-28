@@ -50,10 +50,10 @@ type MRStat struct {
 
 // MRStatDay holds per-day reading data from the dates field.
 type MRStatDay struct {
-	Day       int     // Unix epoch days since 1970-01-01
-	ReadTimeMs int64  // milliseconds read that day
-	WordsRead int64   // words read that day
-	Pct       float64 // progress percentage at end of day
+	Day        int     // Unix epoch days since 1970-01-01
+	ReadTimeMs int64   // milliseconds read that day
+	WordsRead  int64   // words read that day
+	Pct        float64 // progress percentage at end of day
 }
 
 // MRBooks reads mrbooks.db from a temporary file written to dir.
@@ -70,15 +70,15 @@ func OpenMRBooks(data []byte) (*MRBooks, error) {
 	}
 	tmpPath := tmp.Name()
 	if _, err := tmp.Write(data); err != nil {
-		tmp.Close()
-		os.Remove(tmpPath)
+		tmp.Close() //nolint:errcheck
+		os.Remove(tmpPath) //nolint:errcheck
 		return nil, fmt.Errorf("mrbooks: write temp: %w", err)
 	}
-	tmp.Close()
+	tmp.Close() //nolint:errcheck
 
 	db, err := sql.Open("sqlite", filepath.Clean(tmpPath)+"?mode=ro")
 	if err != nil {
-		os.Remove(tmpPath)
+		os.Remove(tmpPath) //nolint:errcheck
 		return nil, fmt.Errorf("mrbooks: open: %w", err)
 	}
 	return &MRBooks{db: db}, nil
@@ -91,7 +91,7 @@ func (m *MRBooks) Close() error {
 	_ = m.db.QueryRow("PRAGMA database_list").Scan(nil, nil, &path)
 	err := m.db.Close()
 	if path != "" {
-		os.Remove(path)
+		os.Remove(path) //nolint:errcheck
 	}
 	return err
 }
@@ -105,7 +105,7 @@ func (m *MRBooks) Books() ([]MRBook, error) {
 	if err != nil {
 		return nil, fmt.Errorf("mrbooks: query books: %w", err)
 	}
-	defer rows.Close()
+	defer rows.Close() //nolint:errcheck
 
 	var books []MRBook
 	for rows.Next() {
@@ -129,7 +129,7 @@ func (m *MRBooks) Notes() ([]MRNote, error) {
 	if err != nil {
 		return nil, fmt.Errorf("mrbooks: query notes: %w", err)
 	}
-	defer rows.Close()
+	defer rows.Close() //nolint:errcheck
 
 	var notes []MRNote
 	for rows.Next() {
@@ -150,7 +150,7 @@ func (m *MRBooks) Statistics() ([]MRStat, error) {
 	if err != nil {
 		return nil, fmt.Errorf("mrbooks: query statistics: %w", err)
 	}
-	defer rows.Close()
+	defer rows.Close() //nolint:errcheck
 
 	var stats []MRStat
 	for rows.Next() {
@@ -171,7 +171,7 @@ func (m *MRBooks) Statistics() ([]MRStat, error) {
 //     where fields are day | readTimeMs @ wordsRead  #pct%
 func parseDays(s string) []MRStatDay {
 	var days []MRStatDay
-	for _, line := range strings.Split(s, "\n") {
+	for line := range strings.SplitSeq(s, "\n") {
 		line = strings.TrimSpace(line)
 		if line == "" {
 			continue
@@ -186,14 +186,14 @@ func parseDays(s string) []MRStatDay {
 			}
 			d.Day = day
 			// rest: "<ms>@<words> #<pct>%"
-			if at := strings.IndexByte(rest, '@'); at >= 0 {
-				ms, _ := strconv.ParseInt(rest[:at], 10, 64)
+			if before, after, ok := strings.Cut(rest, "@"); ok {
+				ms, _ := strconv.ParseInt(before, 10, 64)
 				d.ReadTimeMs = ms
-				tail := rest[at+1:]
-				if hash := strings.Index(tail, " #"); hash >= 0 {
-					words, _ := strconv.ParseInt(tail[:hash], 10, 64)
+				tail := after
+				if before, after, ok := strings.Cut(tail, " #"); ok {
+					words, _ := strconv.ParseInt(before, 10, 64)
 					d.WordsRead = words
-					pctStr := strings.TrimSuffix(tail[hash+2:], "%")
+					pctStr := strings.TrimSuffix(after, "%")
 					d.Pct, _ = strconv.ParseFloat(pctStr, 64)
 				} else {
 					words, _ := strconv.ParseInt(tail, 10, 64)

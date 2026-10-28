@@ -1,4 +1,4 @@
-lunacy
-bin/lunacy
-config.yaml
-data/
+/lunacy
+/bin/lunacy
+/config.yaml
+/data/
