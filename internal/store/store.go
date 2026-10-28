@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"path/filepath"
 
+	"github.com/corani/lunacy/internal/logger"
 	_ "modernc.org/sqlite"
 )
 
@@ -14,13 +15,13 @@ type Store struct {
 }
 
 // Open opens (or creates) the lunacy.db at dataDir and applies migrations.
-func Open(dataDir string) (*Store, error) {
+func Open(dataDir string, log *logger.Logger) (*Store, error) {
 	path := filepath.Join(dataDir, "lunacy.db")
 	db, err := sql.Open("sqlite", path+"?_pragma=foreign_keys(1)&_pragma=journal_mode(WAL)")
 	if err != nil {
 		return nil, fmt.Errorf("store: open %s: %w", path, err)
 	}
-	if err := migrate(db); err != nil {
+	if err := migrate(db, log); err != nil {
 		db.Close() //nolint:errcheck
 		return nil, fmt.Errorf("store: migrate: %w", err)
 	}

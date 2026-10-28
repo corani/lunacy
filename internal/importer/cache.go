@@ -60,7 +60,7 @@ func ImportAnnotations(st *store.Store, content, webdavPath string) error {
 	for _, a := range anns {
 		sa := store.Annotation{
 			Filename:      filename,
-			AnnID:         a.ID,
+			AnnID:         int(a.CreatedAt), // use timestamp as stable cross-source key
 			Length:        a.Length,
 			Color:         a.Color,
 			CreatedAt:     a.CreatedAt,

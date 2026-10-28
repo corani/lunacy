@@ -45,7 +45,7 @@ func main() {
 	}
 
 	// Open store.
-	st, err := store.Open(cfg.DataDir)
+	st, err := store.Open(cfg.DataDir, logger.New("store"))
 	if err != nil {
 		log.Error("open store", "err", err)
 		os.Exit(1)
