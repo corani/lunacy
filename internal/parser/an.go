@@ -126,8 +126,8 @@ func parseANv1Record(lines []string) (Annotation, bool) {
 		Length:     parseInt(lines[7]),
 		Color:      parseInt64(lines[8]),
 		CreatedAt:  parseInt64(lines[9]),
-		Note:       strings.TrimSpace(lines[10]),
-		// lines[11] = noteText2 (unused)
+		// lines[10] = empty (unused first note field)
+		Note: strings.TrimSpace(lines[11]),
 	}
 
 	// Highlighted text runs from line 12 until the last 3 non-empty lines.
@@ -157,7 +157,7 @@ func parseANv1Record(lines []string) (Annotation, bool) {
 }
 
 // parseANv2 parses the inline-delimited PDF format.
-var v2RecordRe = regexp.MustCompile(`#A\*([^#]*)#A1#([^#]*)#A2#([^#]*)#A3#([^#]*)#A4#([^#]*)#A5#([^#]*)#A6#([^#]*)#A7#([\s\S]*?)#A8#([^#]*)#A@`)
+var v2RecordRe = regexp.MustCompile(`#A\*(#?[^#]*)#A1#([^#]*)#A2#([^#]*)#A3#([^#]*)#A4#([^#]*)#A5#([^#]*)#A6#([^#]*)#A7#([\s\S]*?)#A8#([^#]*)#A@`)
 
 func parseANv2(content string) ([]Annotation, error) {
 	matches := v2RecordRe.FindAllStringSubmatch(content, -1)
