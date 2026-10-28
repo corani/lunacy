@@ -42,6 +42,15 @@ func New(davRoot string, st *store.Store, bi *importer.BackupImporter, log *logg
 
 // ServeHTTP implements http.Handler.
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	// Auto-create parent directories on PUT so Moon+ Reader doesn't need to
+	// send MKCOL requests for every intermediate directory.
+	if r.Method == "PUT" {
+		rel := strings.TrimPrefix(r.URL.Path, "/dav/")
+		dir := filepath.Join(h.davRoot, filepath.FromSlash(filepath.Dir(rel)))
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			h.log.Error("mkdir", "path", dir, "err", err)
+		}
+	}
 	h.webdavHandler.ServeHTTP(w, r)
 }
 
