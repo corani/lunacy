@@ -2,6 +2,7 @@ package store
 
 import (
 	"fmt"
+	"path"
 	"strings"
 )
 
@@ -163,16 +164,62 @@ func (s *Store) UpsertAnnotation(a Annotation) error {
 
 // FindFilenameByBasename looks up a book's full filename by matching the
 // basename of its lowerFilename. Returns "" if not found or ambiguous.
+// Uses normalized comparison to handle filesystem character substitutions
+// (e.g. apostrophes, smart quotes, em-dashes replaced with underscores on disk).
 func (s *Store) FindFilenameByBasename(basename string) (string, error) {
+	// First try exact match.
 	var filename string
 	err := s.db.QueryRow(
 		`SELECT filename FROM books WHERE filename LIKE ? AND is_stub=0 LIMIT 1`,
 		"%/"+basename,
 	).Scan(&filename)
-	if err != nil {
-		return "", nil // not found — caller will create stub
+	if err == nil {
+		return filename, nil
 	}
-	return filename, nil
+
+	// Normalize basename and scan all non-stub books for a normalized match.
+	norm := normalizeFilename(basename)
+	rows, err := s.db.Query(`SELECT filename FROM books WHERE is_stub=0`)
+	if err != nil {
+		return "", nil
+	}
+	defer rows.Close() //nolint:errcheck
+	for rows.Next() {
+		var fn string
+		if err := rows.Scan(&fn); err != nil {
+			continue
+		}
+		if normalizeFilename(path.Base(fn)) == norm {
+			return fn, nil
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return "", err
+	}
+	return "", nil // not found — caller will create stub
+}
+
+// normalizeFilename reduces a filename to alphanumeric + dots for fuzzy matching.
+// Any non-alphanumeric character (except dot and slash) becomes an underscore,
+// then runs of underscores are collapsed to one.
+func normalizeFilename(s string) string {
+	var b strings.Builder
+	prev := false
+	for _, r := range s {
+		if r == '.' || r == '/' {
+			b.WriteRune(r)
+			prev = false
+		} else if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') {
+			b.WriteRune(r)
+			prev = false
+		} else {
+			if !prev {
+				b.WriteByte('_')
+			}
+			prev = true
+		}
+	}
+	return b.String()
 }
 
 func (s *Store) UpsertReadingDay(filename string, day int, readTimeMs, wordsRead int64, pct float64) error {
