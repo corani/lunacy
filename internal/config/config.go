@@ -4,6 +4,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/goccy/go-yaml"
 )
@@ -12,6 +13,15 @@ type Config struct {
 	Server  ServerConfig `yaml:"server"`
 	DataDir string       `yaml:"data_dir"`
 	Backup  BackupConfig `yaml:"backup"`
+	Client  ClientConfig `yaml:"client"`
+}
+
+type ClientConfig struct {
+	BaseURL   string        `yaml:"base_url"`
+	Username  string        `yaml:"username"`
+	Password  string        `yaml:"password"`
+	Timeout   time.Duration `yaml:"timeout"`
+	Watermark string        `yaml:"watermark"`
 }
 
 type ServerConfig struct {
@@ -33,6 +43,7 @@ func defaults() Config {
 		Backup: BackupConfig{
 			MaxCount: 10,
 		},
+		Client: ClientConfig{Timeout: 30 * time.Second},
 	}
 }
 

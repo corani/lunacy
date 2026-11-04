@@ -1,6 +1,9 @@
 package store
 
 import (
+	"context"
+	"database/sql"
+	"errors"
 	"fmt"
 	"path"
 	"strings"
@@ -87,107 +90,60 @@ type Stats struct {
 }
 
 // UpsertReadState updates only the read_state field for a book.
-func (s *Store) UpsertReadState(filename string, state int) error {
-	_, err := s.db.Exec(`UPDATE books SET read_state=? WHERE filename=?`, state, filename)
-	return err
+func (s *Store) UpsertReadState(ctx context.Context, filename string, state int) error {
+	return s.MutateBook(ctx, filename, func(m *Mutation) error { return m.ReadState(state) })
 }
 
 // UpsertBook inserts or updates a book row.
-func (s *Store) UpsertBook(b Book) error {
-	_, err := s.db.Exec(`
-		INSERT INTO books (filename, title, author, description, category, series, series_index,
-		                   favorite, rate, add_time, cover_file, is_stub)
-		VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
-		ON CONFLICT(filename) DO UPDATE SET
-		  title        = CASE WHEN excluded.is_stub = 0 THEN excluded.title        ELSE title END,
-		  author       = CASE WHEN excluded.is_stub = 0 THEN excluded.author       ELSE author END,
-		  description  = CASE WHEN excluded.is_stub = 0 THEN excluded.description  ELSE description END,
-		  category     = CASE WHEN excluded.is_stub = 0 THEN excluded.category     ELSE category END,
-		  series       = CASE WHEN excluded.is_stub = 0 THEN excluded.series       ELSE series END,
-		  series_index = CASE WHEN excluded.is_stub = 0 THEN excluded.series_index ELSE series_index END,
-		  favorite     = CASE WHEN excluded.is_stub = 0 THEN excluded.favorite     ELSE favorite END,
-		  rate         = CASE WHEN excluded.is_stub = 0 THEN excluded.rate         ELSE rate END,
-		  add_time     = CASE WHEN excluded.is_stub = 0 THEN excluded.add_time     ELSE add_time END,
-		  is_stub      = excluded.is_stub`,
-		b.Filename, b.Title, b.Author, b.Description, b.Category, b.Series, b.SeriesIndex,
-		b.Favorite, b.Rate, b.AddTime, b.CoverFile, boolToInt(b.IsStub))
-	return err
+func (s *Store) UpsertBook(ctx context.Context, b Book) error {
+	return s.MutateBook(ctx, b.Filename, func(m *Mutation) error { return m.Book(b) })
 }
 
 // UpsertPosition inserts or updates a position row.
-func (s *Store) UpsertPosition(p Position) error {
-	_, err := s.db.Exec(`
-		INSERT INTO positions (filename, chapter, split_index, char_offset, page, pct, last_read)
-		VALUES (?,?,?,?,?,?,?)
-		ON CONFLICT(filename) DO UPDATE SET
-		  chapter=excluded.chapter, split_index=excluded.split_index,
-		  char_offset=excluded.char_offset, page=excluded.page,
-		  pct=excluded.pct, last_read=excluded.last_read`,
-		p.Filename, p.Chapter, p.SplitIndex, p.CharOffset, p.Page, p.Pct, p.LastRead)
-	return err
+func (s *Store) UpsertPosition(ctx context.Context, p Position) error {
+	return s.MutateBook(ctx, p.Filename, func(m *Mutation) error { return m.Position(p, false) })
 }
 
 // UpsertPositionIfEmpty inserts a position row only when no row exists yet or
 // when the existing row has last_read=0 (i.e. only backup-sourced data, no real .po).
-func (s *Store) UpsertPositionIfEmpty(filename string, p Position) error {
-	_, err := s.db.Exec(`
-		INSERT INTO positions (filename, chapter, split_index, char_offset, page, pct, last_read)
-		VALUES (?,?,?,?,?,?,?)
-		ON CONFLICT(filename) DO UPDATE SET
-		  chapter=excluded.chapter, split_index=excluded.split_index,
-		  char_offset=excluded.char_offset, page=excluded.page,
-		  pct=excluded.pct, last_read=excluded.last_read
-		WHERE last_read=0`,
-		p.Filename, p.Chapter, p.SplitIndex, p.CharOffset, p.Page, p.Pct, p.LastRead)
-	return err
+func (s *Store) UpsertPositionIfEmpty(ctx context.Context, filename string, p Position) error {
+	return s.MutateBook(ctx, filename, func(m *Mutation) error { return m.Position(p, true) })
 }
 
 // UpsertAnnotation inserts or updates an annotation row.
-func (s *Store) UpsertAnnotation(a Annotation) error {
-	_, err := s.db.Exec(`
-		INSERT INTO annotations
-		  (filename, ann_id, chapter, split_index, char_offset, page, length, color,
-		   created_at, ann_type, underline, strikethrough, note, text, chapter_label)
-		VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
-		ON CONFLICT(filename, ann_id) DO UPDATE SET
-		  chapter=excluded.chapter, split_index=excluded.split_index,
-		  char_offset=excluded.char_offset, page=excluded.page,
-		  length=excluded.length, color=excluded.color,
-		  created_at=excluded.created_at, ann_type=excluded.ann_type,
-		  underline=excluded.underline, strikethrough=excluded.strikethrough,
-		  note=excluded.note, text=excluded.text, chapter_label=excluded.chapter_label`,
-		a.Filename, a.AnnID, a.Chapter, a.SplitIndex, a.CharOffset, a.Page,
-		a.Length, a.Color, a.CreatedAt, a.Type, a.Underline, a.Strikethrough,
-		a.Note, a.Text, a.ChapterLabel)
-	return err
+func (s *Store) UpsertAnnotation(ctx context.Context, a Annotation) error {
+	return s.MutateBook(ctx, a.Filename, func(m *Mutation) error { return m.Annotation(a, false) })
 }
 
 // FindFilenameByBasename looks up a book's full filename by matching the
 // basename of its lowerFilename. Returns "" if not found or ambiguous.
 // Uses normalized comparison to handle filesystem character substitutions
 // (e.g. apostrophes, smart quotes, em-dashes replaced with underscores on disk).
-func (s *Store) FindFilenameByBasename(basename string) (string, error) {
+func (s *Store) FindFilenameByBasename(ctx context.Context, basename string) (string, error) {
 	// First try exact match.
 	var filename string
-	err := s.db.QueryRow(
+	err := s.db.QueryRowContext(ctx,
 		`SELECT filename FROM books WHERE filename LIKE ? AND is_stub=0 LIMIT 1`,
 		"%/"+basename,
 	).Scan(&filename)
 	if err == nil {
 		return filename, nil
 	}
+	if !errors.Is(err, sql.ErrNoRows) {
+		return "", err
+	}
 
 	// Normalize basename and scan all non-stub books for a normalized match.
 	norm := normalizeFilename(basename)
-	rows, err := s.db.Query(`SELECT filename FROM books WHERE is_stub=0`)
+	rows, err := s.db.QueryContext(ctx, `SELECT filename FROM books WHERE is_stub=0`)
 	if err != nil {
-		return "", nil
+		return "", err
 	}
 	defer rows.Close() //nolint:errcheck
 	for rows.Next() {
 		var fn string
 		if err := rows.Scan(&fn); err != nil {
-			continue
+			return "", err
 		}
 		if normalizeFilename(path.Base(fn)) == norm {
 			return fn, nil
@@ -222,22 +178,20 @@ func normalizeFilename(s string) string {
 	return b.String()
 }
 
-func (s *Store) UpsertReadingDay(filename string, day int, readTimeMs, wordsRead int64, pct float64) error {
-	_, err := s.db.Exec(`
-		INSERT INTO reading_days (filename, day, read_time_s, words_read, pct)
-		VALUES (?,?,?,?,?)
-		ON CONFLICT(filename, day) DO UPDATE SET
-		  read_time_s=excluded.read_time_s, words_read=excluded.words_read, pct=excluded.pct`,
-		filename, day, readTimeMs, wordsRead, pct)
-	return err
+func (s *Store) UpsertReadingDay(ctx context.Context, filename string, day int, readTimeMs, wordsRead int64, pct float64) error {
+	return s.MutateBook(ctx, filename, func(m *Mutation) error {
+		return m.ReadingDay(ReadingDay{Day: day, ReadTimeMs: readTimeMs, WordsRead: wordsRead, Pct: pct})
+	})
 }
 
 // DeleteBooksNotIn removes books (and cascade-deletes their children) whose
 // filename is not in the provided set.
-func (s *Store) DeleteBooksNotIn(filenames []string) error {
+func (s *Store) DeleteBooksNotIn(ctx context.Context, filenames []string) error {
 	if len(filenames) == 0 {
-		_, err := s.db.Exec(`DELETE FROM books`)
-		return err
+		return s.transaction(ctx, func(conn *sql.Conn) error {
+			_, err := conn.ExecContext(ctx, `DELETE FROM books`)
+			return err
+		})
 	}
 	placeholders := strings.Repeat("?,", len(filenames))
 	placeholders = placeholders[:len(placeholders)-1]
@@ -245,25 +199,29 @@ func (s *Store) DeleteBooksNotIn(filenames []string) error {
 	for i, f := range filenames {
 		args[i] = f
 	}
-	_, err := s.db.Exec(`DELETE FROM books WHERE filename NOT IN (`+placeholders+`)`, args...)
-	return err
+	return s.transaction(ctx, func(conn *sql.Conn) error {
+		_, err := conn.ExecContext(ctx, `DELETE FROM books WHERE filename NOT IN (`+placeholders+`)`, args...)
+		return err
+	})
 }
 
 // DeleteAnnotationsByFile removes all annotations for a file (used before full re-import).
-func (s *Store) DeleteAnnotationsByFile(filename string) error {
-	_, err := s.db.Exec(`DELETE FROM annotations WHERE filename=?`, filename)
-	return err
+func (s *Store) DeleteAnnotationsByFile(ctx context.Context, filename string) error {
+	return s.transaction(ctx, func(conn *sql.Conn) error {
+		_, err := conn.ExecContext(ctx, `DELETE FROM annotations WHERE filename=?`, filename)
+		return err
+	})
 }
 
 // BookExists reports whether a book with the given filename exists.
-func (s *Store) BookExists(filename string) (bool, error) {
+func (s *Store) BookExists(ctx context.Context, filename string) (bool, error) {
 	var n int
-	err := s.db.QueryRow(`SELECT COUNT(*) FROM books WHERE filename=?`, filename).Scan(&n)
+	err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM books WHERE filename=?`, filename).Scan(&n)
 	return n > 0, err
 }
 
 // ListBooks returns a paginated book list with joined position and annotation count.
-func (s *Store) ListBooks(shelf, author, series, search, sort, dir string, limit, offset int) ([]Book, error) {
+func (s *Store) ListBooks(ctx context.Context, shelf, author, series, search, sort, dir string, limit, offset int) ([]Book, error) {
 	where, args := buildBookFilter(shelf, author, series, search)
 
 	d := "DESC"
@@ -296,7 +254,7 @@ func (s *Store) ListBooks(shelf, author, series, search, sort, dir string, limit
 		LIMIT ? OFFSET ?`, where, orderBy)
 
 	args = append(args, limit, offset)
-	rows, err := s.db.Query(query, args...)
+	rows, err := s.db.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -317,10 +275,10 @@ func (s *Store) ListBooks(shelf, author, series, search, sort, dir string, limit
 }
 
 // GetBook returns a single book by filename.
-func (s *Store) GetBook(filename string) (Book, error) {
+func (s *Store) GetBook(ctx context.Context, filename string) (Book, error) {
 	var b Book
 	var isStub int
-	err := s.db.QueryRow(`
+	err := s.db.QueryRowContext(ctx, `
 		SELECT b.filename, b.title, b.author, b.description, b.category, b.series, b.series_index,
 		       b.favorite, b.rate, b.add_time, b.cover_file, b.is_stub, b.read_state,
 		       COALESCE(p.pct,0), COALESCE(p.last_read,0), COUNT(a.id)
@@ -337,8 +295,8 @@ func (s *Store) GetBook(filename string) (Book, error) {
 }
 
 // GetAnnotations returns all annotations for a book ordered by chapter/position.
-func (s *Store) GetAnnotations(filename string) ([]Annotation, error) {
-	rows, err := s.db.Query(`
+func (s *Store) GetAnnotations(ctx context.Context, filename string) ([]Annotation, error) {
+	rows, err := s.db.QueryContext(ctx, `
 		SELECT id, ann_id, filename, chapter, split_index, char_offset, page,
 		       length, color, created_at, ann_type, underline, strikethrough,
 		       note, text, chapter_label
@@ -364,8 +322,8 @@ func (s *Store) GetAnnotations(filename string) ([]Annotation, error) {
 }
 
 // GetReadingDays returns the reading history for a book.
-func (s *Store) GetReadingDays(filename string) ([]ReadingDay, error) {
-	rows, err := s.db.Query(`
+func (s *Store) GetReadingDays(ctx context.Context, filename string) ([]ReadingDay, error) {
+	rows, err := s.db.QueryContext(ctx, `
 		SELECT day, read_time_s, words_read, pct FROM reading_days
 		WHERE filename=? ORDER BY day`, filename)
 	if err != nil {
@@ -384,25 +342,13 @@ func (s *Store) GetReadingDays(filename string) ([]ReadingDay, error) {
 }
 
 // UpsertBookAuthors replaces all author entries for a book.
-func (s *Store) UpsertBookAuthors(filename string, authors []string) error {
-	_, err := s.db.Exec(`DELETE FROM book_authors WHERE filename=?`, filename)
-	if err != nil {
-		return err
-	}
-	for _, a := range authors {
-		if a == "" {
-			continue
-		}
-		if _, err := s.db.Exec(`INSERT OR IGNORE INTO book_authors (filename, author) VALUES (?,?)`, filename, a); err != nil {
-			return err
-		}
-	}
-	return nil
+func (s *Store) UpsertBookAuthors(ctx context.Context, filename string, authors []string) error {
+	return s.MutateBook(ctx, filename, func(m *Mutation) error { return m.Authors(authors) })
 }
 
 // ListAuthors returns all distinct authors with book counts, from the join table.
-func (s *Store) ListAuthors() ([]AuthorSummary, error) {
-	rows, err := s.db.Query(`
+func (s *Store) ListAuthors(ctx context.Context) ([]AuthorSummary, error) {
+	rows, err := s.db.QueryContext(ctx, `
 		SELECT author, COUNT(*) FROM book_authors
 		GROUP BY author ORDER BY author`)
 	if err != nil {
@@ -421,8 +367,8 @@ func (s *Store) ListAuthors() ([]AuthorSummary, error) {
 }
 
 // ListSeries returns all series with book counts.
-func (s *Store) ListSeries() ([]SeriesSummary, error) {
-	rows, err := s.db.Query(`
+func (s *Store) ListSeries(ctx context.Context) ([]SeriesSummary, error) {
+	rows, err := s.db.QueryContext(ctx, `
 		SELECT series, COUNT(*) FROM books
 		WHERE series != '' GROUP BY series ORDER BY series`)
 	if err != nil {
@@ -441,17 +387,17 @@ func (s *Store) ListSeries() ([]SeriesSummary, error) {
 }
 
 // GetStats returns global stats.
-func (s *Store) GetStats() (Stats, error) {
+func (s *Store) GetStats(ctx context.Context) (Stats, error) {
 	var st Stats
-	err := s.db.QueryRow(`SELECT COUNT(*) FROM books`).Scan(&st.TotalBooks)
+	err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM books`).Scan(&st.TotalBooks)
 	if err != nil {
 		return st, err
 	}
-	err = s.db.QueryRow(`SELECT COALESCE(SUM(words_read),0) FROM reading_days`).Scan(&st.TotalWords)
+	err = s.db.QueryRowContext(ctx, `SELECT COALESCE(SUM(words_read),0) FROM reading_days`).Scan(&st.TotalWords)
 	if err != nil {
 		return st, err
 	}
-	err = s.db.QueryRow(`SELECT COUNT(DISTINCT day) FROM reading_days`).Scan(&st.ReadingDays)
+	err = s.db.QueryRowContext(ctx, `SELECT COUNT(DISTINCT day) FROM reading_days`).Scan(&st.ReadingDays)
 	return st, err
 }
 

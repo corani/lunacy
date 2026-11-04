@@ -45,6 +45,9 @@ func (h *Handler) routes() {
 	h.mux.HandleFunc("GET /api/series", h.listSeries)
 	h.mux.HandleFunc("GET /api/author/cover", h.getAuthorCover)
 	h.mux.HandleFunc("GET /api/series/cover", h.getSeriesCover)
+	h.mux.HandleFunc("GET /api/v1/sync", h.sync)
+	h.mux.HandleFunc("GET /api/v1/book", h.syncBook)
+	h.mux.HandleFunc("GET /api/v1/book/cover", h.syncCover)
 }
 
 func (h *Handler) serveStatic(fs embed.FS) {
@@ -69,7 +72,7 @@ func (h *Handler) getVersion(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) getStats(w http.ResponseWriter, r *http.Request) {
-	stats, err := h.st.GetStats()
+	stats, err := h.st.GetStats(r.Context())
 	if err != nil {
 		h.jsonError(w, r, http.StatusInternalServerError, err)
 		return
@@ -88,7 +91,7 @@ func (h *Handler) listBooks(w http.ResponseWriter, r *http.Request) {
 	limit := queryIntDef(q, "limit", 48)
 	offset := queryIntDef(q, "offset", 0)
 
-	books, err := h.st.ListBooks(shelf, author, series, search, sortBy, sortDir, limit, offset)
+	books, err := h.st.ListBooks(r.Context(), shelf, author, series, search, sortBy, sortDir, limit, offset)
 	if err != nil {
 		h.jsonError(w, r, http.StatusInternalServerError, err)
 		return
@@ -98,12 +101,12 @@ func (h *Handler) listBooks(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) getBook(w http.ResponseWriter, r *http.Request) {
 	filename := r.URL.Query().Get("f")
-	book, err := h.st.GetBook(filename)
+	book, err := h.st.GetBook(r.Context(), filename)
 	if err != nil {
 		h.jsonError(w, r, http.StatusNotFound, err)
 		return
 	}
-	days, err := h.st.GetReadingDays(filename)
+	days, err := h.st.GetReadingDays(r.Context(), filename)
 	if err != nil {
 		h.jsonError(w, r, http.StatusInternalServerError, err)
 		return
@@ -113,7 +116,7 @@ func (h *Handler) getBook(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) getAnnotations(w http.ResponseWriter, r *http.Request) {
 	filename := r.URL.Query().Get("f")
-	anns, err := h.st.GetAnnotations(filename)
+	anns, err := h.st.GetAnnotations(r.Context(), filename)
 	if err != nil {
 		h.jsonError(w, r, http.StatusInternalServerError, err)
 		return
@@ -123,7 +126,7 @@ func (h *Handler) getAnnotations(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) getCover(w http.ResponseWriter, r *http.Request) {
 	filename := r.URL.Query().Get("f")
-	book, err := h.st.GetBook(filename)
+	book, err := h.st.GetBook(r.Context(), filename)
 	if err != nil {
 		h.serveSVGCover(w, filename+"\n")
 		return
@@ -138,7 +141,7 @@ func (h *Handler) getCover(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) listAuthors(w http.ResponseWriter, r *http.Request) {
-	authors, err := h.st.ListAuthors()
+	authors, err := h.st.ListAuthors(r.Context())
 	if err != nil {
 		h.jsonError(w, r, http.StatusInternalServerError, err)
 		return
@@ -147,7 +150,7 @@ func (h *Handler) listAuthors(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) listSeries(w http.ResponseWriter, r *http.Request) {
-	series, err := h.st.ListSeries()
+	series, err := h.st.ListSeries(r.Context())
 	if err != nil {
 		h.jsonError(w, r, http.StatusInternalServerError, err)
 		return
@@ -184,9 +187,20 @@ func (h *Handler) writeJSON(w http.ResponseWriter, v any) {
 		h.log.Error("json encode", "err", err)
 	}
 }
+
 func (h *Handler) jsonError(w http.ResponseWriter, r *http.Request, code int, err error) {
+	name, message := "internal_error", "unable to complete request"
+	if code == http.StatusNotFound {
+		name, message = "not_found", "book not found"
+	}
+	h.apiError(w, r, code, name, message, err)
+}
+
+func (h *Handler) apiError(w http.ResponseWriter, r *http.Request, code int, name, message string, err error) {
 	h.log.Error("api", "method", r.Method, "path", r.URL.Path, "status", code, "err", err)
-	http.Error(w, err.Error(), code)
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(code)
+	h.writeJSON(w, map[string]any{"error": map[string]string{"code": name, "message": message}})
 }
 
 // CoverDir returns the cover directory path.

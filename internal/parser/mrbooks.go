@@ -2,6 +2,7 @@
 package parser
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"os"
@@ -58,7 +59,8 @@ type MRStatDay struct {
 
 // MRBooks reads mrbooks.db from a temporary file written to dir.
 type MRBooks struct {
-	db *sql.DB
+	db   *sql.DB
+	path string
 }
 
 // OpenMRBooks opens an mrbooks.db from the given raw bytes.
@@ -70,7 +72,7 @@ func OpenMRBooks(data []byte) (*MRBooks, error) {
 	}
 	tmpPath := tmp.Name()
 	if _, err := tmp.Write(data); err != nil {
-		tmp.Close() //nolint:errcheck
+		tmp.Close()        //nolint:errcheck
 		os.Remove(tmpPath) //nolint:errcheck
 		return nil, fmt.Errorf("mrbooks: write temp: %w", err)
 	}
@@ -81,24 +83,21 @@ func OpenMRBooks(data []byte) (*MRBooks, error) {
 		os.Remove(tmpPath) //nolint:errcheck
 		return nil, fmt.Errorf("mrbooks: open: %w", err)
 	}
-	return &MRBooks{db: db}, nil
+	return &MRBooks{db: db, path: tmpPath}, nil
 }
 
 // Close closes the database and removes the temporary file.
 func (m *MRBooks) Close() error {
-	// Retrieve the path before closing.
-	var path string
-	_ = m.db.QueryRow("PRAGMA database_list").Scan(nil, nil, &path)
 	err := m.db.Close()
-	if path != "" {
-		os.Remove(path) //nolint:errcheck
+	if removeErr := os.Remove(m.path); err == nil {
+		err = removeErr
 	}
 	return err
 }
 
 // Books returns all rows from the books table.
-func (m *MRBooks) Books() ([]MRBook, error) {
-	rows, err := m.db.Query(`
+func (m *MRBooks) Books(ctx context.Context) ([]MRBook, error) {
+	rows, err := m.db.QueryContext(ctx, `
 		SELECT book, filename, lowerFilename, author, description, category,
 		       favorite, rate, addTime
 		FROM books`)
@@ -120,8 +119,8 @@ func (m *MRBooks) Books() ([]MRBook, error) {
 }
 
 // Notes returns all rows from the notes table.
-func (m *MRBooks) Notes() ([]MRNote, error) {
-	rows, err := m.db.Query(`
+func (m *MRBooks) Notes(ctx context.Context) ([]MRNote, error) {
+	rows, err := m.db.QueryContext(ctx, `
 		SELECT lowerFilename, lastChapter, lastSplitIndex, lastPosition,
 		       highlightLength, highlightColor, time, note, original,
 		       underline, strikethrough
@@ -145,8 +144,8 @@ func (m *MRBooks) Notes() ([]MRNote, error) {
 }
 
 // Statistics returns all rows from the statistics table.
-func (m *MRBooks) Statistics() ([]MRStat, error) {
-	rows, err := m.db.Query(`SELECT filename, usedTime, readWords, dates FROM statistics`)
+func (m *MRBooks) Statistics(ctx context.Context) ([]MRStat, error) {
+	rows, err := m.db.QueryContext(ctx, `SELECT filename, usedTime, readWords, dates FROM statistics`)
 	if err != nil {
 		return nil, fmt.Errorf("mrbooks: query statistics: %w", err)
 	}

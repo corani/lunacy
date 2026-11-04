@@ -3,6 +3,7 @@ package webdav
 import (
 	"bytes"
 	"compress/zlib"
+	"context"
 	"fmt"
 	"io"
 	"net/http"
@@ -29,13 +30,14 @@ type Handler struct {
 }
 
 // New creates a WebDAV handler serving files from davRoot.
-func New(davRoot string, st *store.Store, bi *importer.BackupImporter, log *logger.Logger) *Handler {
+func New(ctx context.Context, davRoot string, st *store.Store, bi *importer.BackupImporter, log *logger.Logger) *Handler {
 	h := &Handler{st: st, bi: bi, davRoot: davRoot, log: log}
 	h.webdavHandler = &gwebdav.Handler{
 		Prefix:     "/dav",
 		FileSystem: gwebdav.Dir(davRoot),
 		LockSystem: gwebdav.NewMemLS(),
-		Logger:     h.davLog,
+		// Imports belong to the service, not the uploading connection.
+		Logger: func(r *http.Request, err error) { h.davLog(ctx, r, err) },
 	}
 	return h
 }
@@ -54,7 +56,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	h.webdavHandler.ServeHTTP(w, r)
 }
 
-func (h *Handler) davLog(r *http.Request, err error) {
+func (h *Handler) davLog(ctx context.Context, r *http.Request, err error) {
 	if err != nil {
 		h.log.Error("webdav", "method", r.Method, "path", r.URL.Path, "err", err)
 		return
@@ -66,16 +68,16 @@ func (h *Handler) davLog(r *http.Request, err error) {
 	}
 	rel := strings.TrimPrefix(r.URL.Path, "/dav/")
 	diskPath := filepath.Join(h.davRoot, filepath.FromSlash(rel))
-	h.handleUpload(rel, diskPath)
+	h.handleUpload(ctx, rel, diskPath)
 }
 
-func (h *Handler) handleUpload(webdavPath, diskPath string) {
+func (h *Handler) handleUpload(ctx context.Context, webdavPath, diskPath string) {
 	lower := strings.ToLower(webdavPath)
 	start := time.Now()
 
 	switch {
 	case strings.HasSuffix(lower, ".mrpro"):
-		if err := h.bi.Import(diskPath); err != nil {
+		if err := h.bi.Import(ctx, diskPath); err != nil {
 			h.log.Error("backup import", "file", webdavPath, "err", err)
 		} else {
 			h.log.Info("backup import", "file", webdavPath, "elapsed", time.Since(start).Round(time.Millisecond))
@@ -92,7 +94,7 @@ func (h *Handler) handleUpload(webdavPath, diskPath string) {
 			h.log.Error("position import", "file", webdavPath, "err", err)
 			return
 		}
-		if err := importer.ImportPosition(h.st, string(data), webdavPath, info.ModTime().UnixMilli()); err != nil {
+		if err := importer.ImportPosition(ctx, h.st, string(data), webdavPath, info.ModTime().UnixMilli()); err != nil {
 			h.log.Error("position import", "file", webdavPath, "err", err)
 		} else {
 			h.log.Info("position import", "file", webdavPath, "elapsed", time.Since(start).Round(time.Millisecond))
@@ -109,7 +111,7 @@ func (h *Handler) handleUpload(webdavPath, diskPath string) {
 			h.log.Error("annotation import", "file", webdavPath, "err", err)
 			return
 		}
-		if err := importer.ImportAnnotations(h.st, content, webdavPath); err != nil {
+		if err := importer.ImportAnnotations(ctx, h.st, content, webdavPath); err != nil {
 			h.log.Error("annotation import", "file", webdavPath, "err", err)
 		} else {
 			h.log.Info("annotation import", "file", webdavPath, "elapsed", time.Since(start).Round(time.Millisecond))
