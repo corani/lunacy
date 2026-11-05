@@ -8,3 +8,12 @@ data_dir: "./data"
 
 backup:
   max_count: 10
+
+client:
+  # Include any deployment prefix. HTTPS is recommended for Basic Auth.
+  base_url: "http://localhost:8080/"
+  username: "moon"
+  password: "secret"
+  timeout: "30s"
+  # ALWAYS replaced after validated, successfully written sync output.
+  watermark: ""

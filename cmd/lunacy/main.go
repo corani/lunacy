@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"log"
 	"net/http"
@@ -19,6 +20,7 @@ import (
 var version = "dev"
 
 func main() {
+	ctx := context.Background()
 	cfgPath := flag.String("config", "", "path to config.yaml (default: search standard locations)")
 	flag.Parse()
 
@@ -45,7 +47,7 @@ func main() {
 	}
 
 	// Open store.
-	st, err := store.Open(cfg.DataDir, logger.New("store"))
+	st, err := store.Open(ctx, cfg.DataDir, logger.New("store"))
 	if err != nil {
 		log.Error("open store", "err", err)
 		os.Exit(1)
@@ -56,7 +58,7 @@ func main() {
 	bi := importer.NewBackupImporter(st, davRoot, cfg.Backup.MaxCount, logger.New("backup"))
 
 	// Build WebDAV handler.
-	davHandler := webdav.New(davRoot, st, bi, logger.New("webdav"))
+	davHandler := webdav.New(ctx, davRoot, st, bi, logger.New("webdav"))
 
 	// Wrap with BasicAuth only when credentials are configured.
 	// Leave username empty to disable auth (e.g. when running behind Traefik).

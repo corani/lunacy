@@ -61,7 +61,7 @@ jobs:
         env:
           VERSION: ${{ github.ref_name }}
           ARCH: ${{ matrix.arch }}
-        run: tar -czf "lunacy_${VERSION}_linux_${ARCH}.tar.gz" -C bin lunacy
+        run: tar -czf "lunacy_${VERSION}_linux_${ARCH}.tar.gz" -C bin lunacy lunacy-cli
       - uses: actions/upload-artifact@v7.0.2
         with:
           name: lunacy-linux-${{ matrix.arch }}
