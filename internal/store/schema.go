@@ -87,4 +87,34 @@ var migrations = []migration{
 		SELECT MIN(id) FROM annotations GROUP BY filename, created_at
 	)`},
 	{"deduplicate annotations by created_at", `UPDATE annotations SET ann_id = created_at WHERE created_at != 0`},
+
+	{"read-only synchronization", `
+		ALTER TABLE books ADD COLUMN updated_at INTEGER NOT NULL DEFAULT 0;
+		ALTER TABLE books ADD COLUMN sync_updated_at INTEGER NOT NULL DEFAULT 0;
+		ALTER TABLE books ADD COLUMN cover_hash TEXT NOT NULL DEFAULT '';
+		ALTER TABLE positions ADD COLUMN updated_at INTEGER NOT NULL DEFAULT 0;
+		ALTER TABLE annotations ADD COLUMN updated_at INTEGER NOT NULL DEFAULT 0;
+		ALTER TABLE reading_days ADD COLUMN updated_at INTEGER NOT NULL DEFAULT 0;
+		CREATE TABLE reading_totals (
+			filename TEXT PRIMARY KEY REFERENCES books(filename) ON DELETE CASCADE,
+			used_time_ms INTEGER NOT NULL,
+			read_words INTEGER NOT NULL,
+			updated_at INTEGER NOT NULL
+		);
+		CREATE TABLE sync_state (
+			id INTEGER PRIMARY KEY CHECK (id = 1),
+			baseline_at INTEGER NOT NULL,
+			timestamp_floor INTEGER NOT NULL
+		);
+		INSERT INTO sync_state VALUES (1,
+			CAST((julianday('now') - 2440587.5) * 86400000 AS INTEGER),
+			CAST((julianday('now') - 2440587.5) * 86400000 AS INTEGER));
+		UPDATE books SET updated_at=(SELECT baseline_at FROM sync_state),
+			sync_updated_at=(SELECT baseline_at FROM sync_state);
+		UPDATE positions SET updated_at=(SELECT baseline_at FROM sync_state);
+		UPDATE annotations SET updated_at=(SELECT baseline_at FROM sync_state);
+		UPDATE reading_days SET updated_at=(SELECT baseline_at FROM sync_state);
+		CREATE INDEX idx_books_sync_updated_at ON books(sync_updated_at);
+		CREATE INDEX idx_annotations_updated_at ON annotations(updated_at);
+	`},
 }

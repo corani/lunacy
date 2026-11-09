@@ -1,4 +1,6 @@
 /lunacy
 /bin/lunacy
+/bin/lunacy-cli
 /config.yaml
 /data/
+/.github/skills/

@@ -32,7 +32,7 @@ function do_echo {
 function usage {
   log_info "Usage: $(basename "$prog") [-h] [-b] [-t] [-v] [-l] [-g] [-i] [-r [VERSION]]"
   log_info "  -h, help:    Show this help message"
-  log_info "  -b, build:   Build bin/lunacy"
+  log_info "  -b, build:   Build bin/lunacy and bin/lunacy-cli"
   log_info "  -t, test:    Run Go tests with per-package coverage"
   log_info "  -v, vet:     Run go vet"
   log_info "  -l, lint:    Run golangci-lint"
@@ -129,6 +129,7 @@ while [ "$#" -gt 0 ]; do
   -b | build)
     do_echo mkdir -p bin/
     do_echo go build -trimpath -ldflags "-s -w -X main.version=$version" -o bin/lunacy ./cmd/lunacy
+    do_echo go build -trimpath -ldflags "-s -w" -o bin/lunacy-cli ./cmd/lunacy-cli
     ;;
   -t | test)
     do_echo go test -cover ./...
